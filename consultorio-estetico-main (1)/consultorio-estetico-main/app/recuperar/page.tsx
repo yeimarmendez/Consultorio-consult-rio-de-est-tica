@@ -1,26 +1,59 @@
+
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function RecuperarPage() {
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
-    setSent(true);
-    setTimeout(() => {
-      setSent(false);
-      router.push("/login");
-    }, 2500);
+
+    setLoading(true);
+    setError("");
+    setMensaje("");
+
+    try {
+      const { error: resetError } =
+        await supabase.auth.resetPasswordForEmail(
+          email.trim(),
+          {
+            redirectTo:
+              `${window.location.origin}/restablecer`,
+          }
+        );
+
+      if (resetError) {
+        throw resetError;
+      }
+
+      setMensaje(
+        "Si el correo está registrado, recibirás un enlace para restablecer tu contraseña. Revisa también la carpeta de spam."
+      );
+    } catch (err) {
+      console.error("Error de recuperación:", err);
+      setError(
+        "No se pudo procesar la solicitud. Intenta nuevamente."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <section
       style={{
-        background: "linear-gradient(180deg, #FAF9F7 0%, #F1E9E0 100%)",
+        background:
+          "linear-gradient(180deg, #FAF9F7 0%, #F1E9E0 100%)",
         minHeight: "100vh",
         display: "flex",
         alignItems: "center",
@@ -29,7 +62,7 @@ export default function RecuperarPage() {
       <div className="container text-center">
         <div className="col-md-6 mx-auto">
           <div
-            className="card shadow-lg border-0 rounded-4 animate-fadein"
+            className="card shadow-lg border-0 rounded-4"
             style={{ backgroundColor: "#FFFDF9" }}
           >
             <div className="card-body p-5">
@@ -37,22 +70,46 @@ export default function RecuperarPage() {
                 className="fw-bold mb-3"
                 style={{
                   color: "#4E3B2B",
-                  fontFamily: "'Playfair Display', serif",
+                  fontFamily:
+                    "'Playfair Display', serif",
                 }}
               >
                 Recuperar contraseña
               </h2>
+
               <p className="text-muted mb-4">
-                Ingresa tu correo para recibir un enlace de recuperación.
+                Ingresa tu correo electrónico para
+                recibir un enlace de recuperación.
               </p>
+
+              {mensaje && (
+                <div
+                  className="alert alert-success"
+                  role="status"
+                >
+                  {mensaje}
+                </div>
+              )}
+
+              {error && (
+                <div
+                  className="alert alert-danger"
+                  role="alert"
+                >
+                  {error}
+                </div>
+              )}
 
               <form onSubmit={handleSubmit}>
                 <input
                   type="email"
+                  required
                   className="form-control mb-3"
                   placeholder="tucorreo@dominio.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) =>
+                    setEmail(e.target.value)
+                  }
                   style={{
                     borderColor: "#E9DED2",
                     backgroundColor: "#FFFDF9",
@@ -62,49 +119,34 @@ export default function RecuperarPage() {
                 <button
                   type="submit"
                   className="btn w-100 py-2 fw-semibold"
+                  disabled={loading}
                   style={{
                     backgroundColor: "#B08968",
                     border: "none",
                     color: "#FFF",
                     borderRadius: "50px",
                   }}
-                  disabled={sent}
                 >
-                  {sent ? "Enviando enlace..." : "Enviar enlace"}
+                  {loading
+                    ? "Enviando enlace..."
+                    : "Enviar enlace"}
                 </button>
               </form>
 
-              <p
-                onClick={() => router.push("/login")}
-                style={{
-                  color: "#B08968",
-                  textDecoration: "underline",
-                  marginTop: "1rem",
-                  cursor: "pointer",
-                }}
+              <button
+                type="button"
+                className="btn btn-link mt-3"
+                style={{ color: "#B08968" }}
+                onClick={() =>
+                  router.push("/login")
+                }
               >
                 Volver al inicio de sesión
-              </p>
+              </button>
             </div>
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes fadein {
-          from {
-            opacity: 0;
-            transform: translateY(15px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadein {
-          animation: fadein 0.6s ease forwards;
-        }
-      `}</style>
     </section>
   );
 }
