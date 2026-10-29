@@ -1,139 +1,115 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
-import FondoAnim from "@/components/FondoAnim";
-import { api } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
-interface Testimonio {
-  id: number;
-  nombre: string;
-  texto: string;
-  video: string;
-  thumb: string;
-  activo: boolean;
-  destacado: boolean;
-  creadoEn: string;
-}
-
-export default function TestimoniosPage() {
-  const [testimonios, setTestimonios] = useState<Testimonio[]>([]);
-  const [videoActivo, setVideoActivo] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function AuthCallbackPage() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<{ ok: boolean; testimonios: Testimonio[] }>("/testimonios")
-      .then((res) => { if (res.ok) setTestimonios(res.testimonios); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+    let activo = true;
 
-  const getEmbedUrl = (url: string) => {
-    if (!url) return "";
-    const ytMatch = url.match(/(?:v=|youtu\.be\/)([^&?]+)/);
-    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`;
-    return url;
-  };
+    async function completarAutenticacion() {
+      try {
+        const params = new URLSearchParams(
+          window.location.search
+        );
+
+        const errorOAuth =
+          params.get("error_description") ||
+          params.get("error");
+
+        if (errorOAuth) {
+          if (activo) setError(errorOAuth);
+          return;
+        }
+
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (!activo) return;
+
+        if (sessionError || !session) {
+          setError(
+            sessionError?.message ||
+              "No se pudo completar el inicio de sesión."
+          );
+          return;
+        }
+
+        router.replace("/");
+      } catch (err) {
+        console.error("Error de autenticación:", err);
+
+        if (activo) {
+          setError(
+            "Ocurrió un error al iniciar sesión con Google."
+          );
+        }
+      }
+    }
+
+    completarAutenticacion();
+
+    return () => {
+      activo = false;
+    };
+  }, [router]);
 
   return (
-    <main
+    <div
+      className="d-flex justify-content-center align-items-center"
       style={{
-        position: "relative", overflow: "hidden",
-        minHeight: "100vh", padding: "5rem 2rem", backgroundColor: "#FAF7F2",
+        minHeight: "100vh",
+        backgroundColor: "#FAF7F2",
       }}
     >
-      <div className="absolute inset-0 z-0">
-        <FondoAnim />
-      </div>
+      <div className="text-center p-4">
+        {error ? (
+          <>
+            <h3 style={{ color: "#8C2B2B" }}>
+              Error de autenticación
+            </h3>
 
-      <div className="container position-relative" style={{ zIndex: 1, maxWidth: 1100 }}>
-        <h1
-          className="text-center fw-bold mb-2"
-          style={{ color: "#4E3B2B", fontFamily: "'Playfair Display', serif", fontSize: "2.6rem" }}
-        >
-          Testimonios
-        </h1>
-        <p className="text-center mb-5" style={{ color: "#8B6A4B" }}>
-          Lo que dicen nuestras pacientes sobre sus resultados.
-        </p>
+            <p>{error}</p>
 
-        {loading ? (
-          <div className="text-center py-5">
-            <div className="spinner-border" style={{ color: "#B08968" }} role="status" />
-          </div>
-        ) : testimonios.length === 0 ? (
-          <p className="text-center" style={{ color: "#8B6A4B" }}>
-            Aún no hay testimonios publicados.
-          </p>
+            <button
+              className="btn"
+              style={{
+                backgroundColor: "#B08968",
+                color: "white",
+              }}
+              onClick={() => router.replace("/login")}
+            >
+              Volver al inicio de sesión
+            </button>
+          </>
         ) : (
-          <div className="row g-4">
-            {testimonios.map((t) => (
-              <div key={t.id} className="col-md-6 col-lg-4">
-                <div
-                  className="card border-0 rounded-4 shadow-sm h-100"
-                  style={{ backgroundColor: "#FFFDF9" }}
-                >
-                  {/* Thumbnail / video */}
-                  <div
-                    className="position-relative rounded-top-4 overflow-hidden"
-                    style={{ height: 200, backgroundColor: "#E9DED2", cursor: t.video ? "pointer" : "default" }}
-                    onClick={() => t.video && setVideoActivo(t.id)}
-                  >
-                    {videoActivo === t.id ? (
-                      <iframe
-                        src={getEmbedUrl(t.video)}
-                        title={t.nombre}
-                        allow="autoplay; encrypted-media"
-                        allowFullScreen
-                        style={{ width: "100%", height: "100%", border: "none" }}
-                      />
-                    ) : (
-                      <>
-                        {t.thumb ? (
-                          <img
-                            src={t.thumb}
-                            alt={t.nombre}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <div className="w-100 h-100 d-flex align-items-center justify-content-center">
-                            <span style={{ fontSize: "3rem" }}>💬</span>
-                          </div>
-                        )}
-                        {t.video && (
-                          <div
-                            className="position-absolute top-50 start-50 translate-middle d-flex align-items-center justify-content-center rounded-circle"
-                            style={{ width: 52, height: 52, backgroundColor: "rgba(0,0,0,0.55)" }}
-                          >
-                            <span style={{ color: "#fff", fontSize: "1.4rem" }}>▶</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+          <>
+            <div
+              className="spinner-border"
+              style={{ color: "#B08968" }}
+              role="status"
+            />
 
-                  {/* Contenido */}
-                  <div className="card-body p-4">
-                    {t.destacado && (
-                      <span
-                        className="badge rounded-pill mb-2 px-3"
-                        style={{ backgroundColor: "#FFF3E6", color: "#B08968" }}
-                      >
-                        ⭐ Destacado
-                      </span>
-                    )}
-                    <h5 className="fw-bold mb-2" style={{ color: "#4E3B2B" }}>
-                      {t.nombre}
-                    </h5>
-                    <p style={{ color: "#6C584C", fontSize: "0.9rem", lineHeight: 1.6 }}>
-                      "{t.texto}"
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+            <h4
+              className="mt-4"
+              style={{ color: "#4E3B2B" }}
+            >
+              Iniciando sesión...
+            </h4>
+
+            <p style={{ color: "#8B6A4B" }}>
+              Estamos verificando tu cuenta.
+            </p>
+          </>
         )}
       </div>
-    </main>
+    </div>
   );
 }
